@@ -1,8 +1,8 @@
-# CS337 Project 1
+# CS337 Project 2
 # Ben Raivel
 # process class
 
-class Process():
+class Process:
 
     def __init__(self, PID, duty, arrival_time, priority):
         '''
@@ -23,7 +23,7 @@ class Process():
         self.queue = 0
 
     def __str__(self):
-        return 'Process[PID: ' + str(self.PID) + ', status: ' + self.status + ']'
+        return 'P' + str(self.PID) + '{status: ' + self.status + ' | wait: ' + str(self.wait_time) + '}'
 
     # getter and setter methods for process
     def get_PID(self):
@@ -61,3 +61,13 @@ class Process():
 
     def set_queue(self, queue):
         self.queue = queue
+
+
+def main():
+
+    p = Process(1,[1],1,1)
+    print(p)
+
+
+if __name__== '__main__':
+    main()

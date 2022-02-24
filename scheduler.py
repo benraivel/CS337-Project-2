@@ -2,8 +2,6 @@
 # Ben Raivel
 # process scheduling algorithm implementations
 
-import re
-import numpy as np
 import process
 
 
@@ -139,10 +137,14 @@ def priority_scheduler(processes, ready, CPU, time, verbose=True):
 
     return time
 
-def RR_scheduler(processes, ready, waiting, CPU, time, verbose=True):
+def RR_scheduler(processes, ready, waiting, CPU, time, verbose=True, **kwargs):
     '''
     round robin scheduler
     '''
+    quantum = 2
+    for key, val in kwargs.items():
+        if key == 'quantum':
+            quantum = val
     # get earliest arrival
     process = find_lowest_arrival(ready)
 
@@ -156,7 +158,7 @@ def RR_scheduler(processes, ready, waiting, CPU, time, verbose=True):
         process.response_time = start_time - process.get_arrival()
 
     # run process for one quantum
-    for i in range(2):
+    for i in range(quantum):
 
         # decrement CPU
         process.get_duty()[0] -= 1
@@ -171,7 +173,7 @@ def RR_scheduler(processes, ready, waiting, CPU, time, verbose=True):
         manage_waiting(ready, waiting, time)
 
         # if the process is finished with the CPU
-        if process.get_duty()[0] == 0: break
+        if process.get_duty()[0] < 1: break
         
     # set end time 
     end_time = time
@@ -188,14 +190,15 @@ def RR_scheduler(processes, ready, waiting, CPU, time, verbose=True):
 
     # print process summary
     if(verbose):
-        print('PID: ' + str(process.get_PID()) + 
-            '\t[start, end]: [' + str(start_time) + ', ' + str(end_time) + ']' +
-            '\twait : ' + str(process.wait_time) +
-            '\tturnaround : ' + str(process.turnaround_time))
+        print('PID: ' + str(process.get_PID())
+                + ' | Burst: ' + str(process.get_duty()[0]) 
+                + ' | start: ' + str(start_time) + ', end: ' + str(end_time) 
+                + ' | wait : ' + str(process.wait_time)
+                + ' | turnaround : ' + str(process.turnaround_time))
 
 
     # if the process is finished with the CPU
-    if process.get_duty()[0] == 0:
+    if process.get_duty()[0] < 1:
         
         if len(process.get_duty()) > 1:
             waiting.append(process)
@@ -212,10 +215,98 @@ def RR_scheduler(processes, ready, waiting, CPU, time, verbose=True):
 
 def SRT_scheduler(processes, ready, waiting, CPU, time, verbose=True):
     '''
-    shortest runtime first scheduler
+    shortest remaining time scheduler
     '''
     # find shortest process
     process = find_shortest(ready)
+
+    # set start time
+    start_time = time
+
+    # if response time is None
+    if process.response_time is None:
+        
+        # set to time first entered cpu - arrival time
+        process.response_time = start_time - process.get_arrival()
+
+    # while CPU burst time remains
+    while(process.get_duty()[0] > 0):
+
+        # run for one time slice
+        process.get_duty()[0] -= 1
+
+        time += 1
+
+        # check for new arrivals
+        new_arrived = add_ready(processes, ready, time)
+
+        # move processes that are done waiting back to ready
+        waiting_arrived = manage_waiting(ready, waiting, time)
+
+        # interrupt if there are new jobs
+        if new_arrived or waiting_arrived:
+
+            # get shortest process in ready
+            shortest_ready_process = find_shortest(ready)
+
+            # if new process is shorter than remaining time
+            if shortest_ready_process.get_duty()[0] < process.get_duty()[0]: 
+                
+                # put process back in ready queue
+                ready.append(shortest_ready_process)
+
+                # breake out of while loop
+                break
+            
+            # put new process back in ready queue and continue current process
+            ready.append(shortest_ready_process)
+
+    # set end time
+    end_time = time
+
+    # record process data to CPU list
+    CPU.append(dict(process=process.get_PID(), 
+                    start=start_time,
+                    finish=end_time,
+                    priority=process.get_priority()))
+
+    # update waiting, turnaround times
+    process.wait_time += start_time - process.get_arrival()
+    process.turnaround_time += end_time - process.get_arrival()
+
+    # print process summary
+    if(verbose):
+        print('PID: ' + str(process.get_PID())
+                + ' | Burst: ' + str(process.get_duty()[0]) 
+                + ' | start: ' + str(start_time) + ', end: ' + str(end_time) 
+                + ' | wait : ' + str(process.wait_time)
+                + ' | turnaround : ' + str(process.turnaround_time))
+
+
+    # if the process is finished with the CPU
+    if process.get_duty()[0] == 0:
+        
+        if len(process.get_duty()) > 1:
+
+            process.set_waiting()
+            waiting.append(process)
+        
+    else:
+        # set new arrival time
+        process.set_arrival(time)
+
+        # add process back to ready
+        ready.append(process)
+
+    return time
+
+def PP_scheduler(processes, ready, waiting, CPU, time, verbose=True):
+    '''
+    preemptive priority scheduler
+    '''
+    
+    # find highest priority process
+    process = find_highest_priority(ready)
 
     # set start time
     start_time = time
@@ -240,20 +331,25 @@ def SRT_scheduler(processes, ready, waiting, CPU, time, verbose=True):
         # move processes that are done waiting back to ready
         waiting_arrived = manage_waiting(ready, waiting, time)
 
-        # interrupt if there is a shorter job
+        # interrupt if there is a higher priority job
         if new_arrived or waiting_arrived:
 
-            # loop over newly added processes
-            shortest_ready_process = find_shortest(ready)
+            # get highest priority process in ready
+            highest_ready_process = find_highest_priority(ready)
 
-            # if shortest new process is shorter than remaining time break
-            if shortest_ready_process.get_duty()[0] < process.get_duty()[0]: 
-                
-                ready.append(shortest_ready_process)
+            # if new process is higher priority than current
+            if highest_ready_process.get_priority() > process.get_priority():
+
+                # put process back in the ready queue
+                ready.append(highest_ready_process)
+
+                # break out of while loop
                 break
 
-            ready.append(shortest_ready_process)
+            # put new process in ready queue and continue current process
+            ready.append(highest_ready_process)
 
+    # set end time 
     end_time = time
 
     # record process data to CPU list
@@ -268,10 +364,11 @@ def SRT_scheduler(processes, ready, waiting, CPU, time, verbose=True):
 
     # print process summary
     if(verbose):
-        print('PID: ' + str(process.get_PID()) + 
-            '\t[start, end]: [' + str(start_time) + ', ' + str(end_time) + ']' +
-            '\twait : ' + str(process.wait_time) +
-            '\tturnaround : ' + str(process.turnaround_time))
+        print('PID: ' + str(process.get_PID())
+                + ' | Burst: ' + str(process.get_duty()[0]) 
+                + ' | start: ' + str(start_time) + ', end: ' + str(end_time) 
+                + ' | wait : ' + str(process.wait_time)
+                + ' | turnaround : ' + str(process.turnaround_time))
 
 
     # if the process is finished with the CPU
@@ -288,16 +385,6 @@ def SRT_scheduler(processes, ready, waiting, CPU, time, verbose=True):
         ready.append(process)
 
     return time
-
-def PP_scheduler(processes, ready, CPU, time, verbose=True):
-    # find highest priority process
-
-    # run one time slice
-
-    # check for new arrivals
-
-    # preempt if higher priority process arrives
-    pass
 
 # extension
 def MLFQ_scheduler(processes, ready, CPU, time, verbose=True):
@@ -373,7 +460,7 @@ def find_highest_priority(ready):
             idx = i
 
         # if priority is equal
-        elif ready[i].get_priority() == ready[i].get_priority():
+        elif ready[i].get_priority() == ready[idx].get_priority():
 
             # resolve using PID
             if ready[i].get_PID() < ready[idx].get_PID():
@@ -453,32 +540,7 @@ def manage_waiting(ready, waiting, time):
 
 
 def main():
-    p0 = process.Process(0, 3, 0, 4)
-    p1 = process.Process(1, 6, 3, 7)
-    p2 = process.Process(2, 2, 9, 2)
-    p3 = process.Process(3, 12, 10, 6)
-
-    ready = [p0, p1]
-
-    lowest_arrival = find_lowest_arrival(ready)
-
-    print(lowest_arrival.get_arrival_time())
-
-    ready = [p3, p2, p1]
-
-    lowest_arrival = find_lowest_arrival(ready)
-
-    print(lowest_arrival.get_arrival_time())
-
-    processes = [p0, p1, p2, p3]
-
-    ready = []
-
-    time = 0
-
-    add_ready(processes, ready, time)
-
-    print(ready, processes)
+    pass
 
 if __name__ == '__main__':
     main()

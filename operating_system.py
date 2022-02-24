@@ -3,7 +3,7 @@ import scheduler as s
 import pandas as pd
 
 
-def kernel(scheduler, processes = None, verbose = True, **kwargs):
+def kernel(scheduler, max_arrival, processes = None, verbose = True, **kwargs):
     '''
     uses scheduler function to schedule processes and record statistics
     '''
@@ -14,10 +14,10 @@ def kernel(scheduler, processes = None, verbose = True, **kwargs):
 
     # if a list of processes isn't provided
     if processes == None:
-        processes = [p.Process(0, [3,6,3], 0, 4),
-                 p.Process(1, [1,4,2], 1, 7),
-                 p.Process(2, [4,1,2], 2, 2),
-                 p.Process(3, [9,1,6], 3, 6)]
+        processes = [p.Process(0, [5, 1, 7], 0, 30),
+                 p.Process(1, [4, 4, 2], 2, 35),
+                 p.Process(2, [1, 6, 2], 5, 36),
+                 p.Process(3, [6, 1, 5], 6, 20)]
     
     # set time to zero
     time = 0
@@ -26,7 +26,7 @@ def kernel(scheduler, processes = None, verbose = True, **kwargs):
     s.add_ready(processes, ready, time)
 
     # loop while there are processes that have not finished
-    while len(ready) > 0 or len(waiting) > 0:
+    while len(ready) > 0 or time < max_arrival:
 
         # if no processes are ready
         if len(ready) == 0:
@@ -42,7 +42,7 @@ def kernel(scheduler, processes = None, verbose = True, **kwargs):
 
         # otherwise run the scheduler
         else:
-            time = scheduler(processes, ready, waiting, CPU, time, verbose)
+            time = scheduler(processes, ready, waiting, CPU, time, verbose, **kwargs)
 
     # lists for wait and turnaround times
     wait_times = []
