@@ -27,7 +27,7 @@ def kernel(scheduler, processes = None, verbose = True, **kwargs):
 
     # loop while there are processes that have not finished
     while len(ready) > 0 or len(waiting) > 0:
-        print(str(ready), str(waiting))
+
         # if no processes are ready
         if len(ready) == 0:
 
@@ -39,7 +39,7 @@ def kernel(scheduler, processes = None, verbose = True, **kwargs):
 
             # move processes done with I/O back to ready
             s.manage_waiting(ready, waiting, time)
-        
+
         # otherwise run the scheduler
         else:
             time = scheduler(processes, ready, waiting, CPU, time, verbose)
@@ -47,6 +47,7 @@ def kernel(scheduler, processes = None, verbose = True, **kwargs):
     # lists for wait and turnaround times
     wait_times = []
     turnaround_times = []
+    response_times = []
 
     # loop over CPU
     for finished_process in CPU:
@@ -60,9 +61,12 @@ def kernel(scheduler, processes = None, verbose = True, **kwargs):
         # get wait and turnaround times
         wait_times.append(process.wait_time)
         turnaround_times.append(process.turnaround_time)
+        response_times.append(process.response_time)
 
     # print avg wait and turnaround time
-    print('avg. wait time: ' + str(sum(wait_times)/len(wait_times)), '\navg. turnaround time: ' + str(sum(turnaround_times)/len(turnaround_times)))
+    print('avg. wait time: ' + str(sum(wait_times)/len(wait_times))
+            + '\navg. turnaround time: ' + str(sum(turnaround_times)/len(turnaround_times))
+            + '\navg. response time: ' + str(sum(response_times)/len(response_times)))
     
     # save data to csv
     df = pd.DataFrame(CPU)

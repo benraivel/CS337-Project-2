@@ -139,7 +139,7 @@ def priority_scheduler(processes, ready, CPU, time, verbose=True):
 
     return time
 
-def RR_scheduler(processes, ready, waiting, CPU, time, quantum = 2, verbose=True):
+def RR_scheduler(processes, ready, waiting, CPU, time, verbose=True):
     '''
     round robin scheduler
     '''
@@ -149,14 +149,14 @@ def RR_scheduler(processes, ready, waiting, CPU, time, quantum = 2, verbose=True
     # set start time
     start_time = time
 
-     # if response time is 0 (not set)
-    if process.response_time == 0:
+     # if response time is None
+    if process.response_time is None:
         
         # set to time
         process.response_time = start_time - process.get_arrival()
 
     # run process for one quantum
-    for i in range(quantum):
+    for i in range(2):
 
         # decrement CPU
         process.get_duty()[0] -= 1
@@ -217,20 +217,77 @@ def SRT_scheduler(processes, ready, waiting, CPU, time, verbose=True):
     # find shortest process
     process = find_shortest(ready)
 
+    # set start time
+    start_time = time
+
+    # if response time is None
+    if process.response_time is None:
+        
+        # set to time
+        process.response_time = start_time - process.get_arrival()
+
     # while CPU burst time remains
     while(process.get_duty()[0] > 0):
 
         # run for one time slice
         process.get_duty()[0] -= 1
 
+        time += 1
+
         # check for new arrivals
-        add_ready(processes, ready, time)
+        new_arrived = add_ready(processes, ready, time)
 
         # move processes that are done waiting back to ready
-        manage_waiting(ready, waiting, time)
+        waiting_arrived = manage_waiting(ready, waiting, time)
 
         # interrupt if there is a shorter job
+        if new_arrived or waiting_arrived:
+
+            # loop over newly added processes
+            shortest_ready_process = find_shortest(ready)
+
+            # if shortest new process is shorter than remaining time break
+            if shortest_ready_process.get_duty()[0] < process.get_duty()[0]: 
+                
+                ready.append(shortest_ready_process)
+                break
+
+            ready.append(shortest_ready_process)
+
+    end_time = time
+
+    # record process data to CPU list
+    CPU.append(dict(process=process.get_PID(), 
+                    start=start_time,
+                    finish=end_time,
+                    priority=process.get_priority()))
+
+    # update waiting, turnaround times
+    process.wait_time += start_time - process.get_arrival()
+    process.turnaround_time += end_time - process.get_arrival()
+
+    # print process summary
+    if(verbose):
+        print('PID: ' + str(process.get_PID()) + 
+            '\t[start, end]: [' + str(start_time) + ', ' + str(end_time) + ']' +
+            '\twait : ' + str(process.wait_time) +
+            '\tturnaround : ' + str(process.turnaround_time))
+
+
+    # if the process is finished with the CPU
+    if process.get_duty()[0] == 0:
         
+        if len(process.get_duty()) > 1:
+            waiting.append(process)
+        
+    else:
+        # set new arrival time
+        process.set_arrival(time)
+
+        # add process back to ready
+        ready.append(process)
+
+    return time
 
 def PP_scheduler(processes, ready, CPU, time, verbose=True):
     # find highest priority process
@@ -298,6 +355,7 @@ def find_shortest(ready):
     # remove and return
     return ready.pop(idx)
 
+
 def find_highest_priority(ready):
     '''
     returns highest priority process in ready
@@ -330,6 +388,9 @@ def add_ready(processes, ready, time):
     '''
     adds processes to ready at correct time
     '''
+    # number of processes added
+    added = False
+
     # loop over processes
     for process in processes:
 
@@ -339,12 +400,19 @@ def add_ready(processes, ready, time):
             # add process to ready queue
             ready.append(process)
 
+            # process was added
+            added = True
+
+    return added
 
 def manage_waiting(ready, waiting, time):
     '''
     - decrements waiting time of processes in waiting 
     - moves processes that have finished I/O from waiting to ready
     '''
+    # number of processes added
+    added = False
+
     removed = 0
 
     # loop over waiting processes
@@ -370,14 +438,17 @@ def manage_waiting(ready, waiting, time):
     
             # add process to ready queue
             ready.append(process)
+
+            # process was added
+            added = True
         
-        # otherwise
+        # otherwise process stays in waiting
         else:
 
             # decrement waiting time in duty array
             waiting[i-removed].get_duty()[1] -= 1
 
-
+    return added
 
 
 

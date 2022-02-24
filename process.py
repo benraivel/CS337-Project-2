@@ -17,7 +17,7 @@ class Process():
         # set wait time, turnaround time, and response time to zero
         self.wait_time = 0
         self.turnaround_time = 0
-        self.response_time = 0
+        self.response_time = None
 
         self.status = 'running'
         self.queue = 0
